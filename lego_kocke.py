@@ -1,19 +1,16 @@
-import stevila_setov_po_letih as leta
 import csv
 import os
 import requests
 import re
 import time
 import random
-import math
-import json
+import orodja
 
 kocke = []
-
+leta = range(1949, 2023)
 
 brickset_glavni_url = 'https://brickset.com/sets/year-'
-
-strani = 'strani'
+cookies_dict = {'setsPageLength': "1000"} # Cookie omogoča, da za vsako leto naložimo le eno stran
 
 
 def download_url_to_string(url):
@@ -21,7 +18,7 @@ def download_url_to_string(url):
     strani kot niz. V primeru, da med izvajanje pride do napake vrne None.
     """
     try:
-        page_content = requests.get(url).text
+        page_content = requests.get(url, cookies=cookies_dict).text
     except Exception as e:
         print(f'Prišlo je do napake pri prenosu: {url} ::!', e)
         return None
@@ -40,7 +37,6 @@ def save_string_to_file(text, directory, filename):
     return None
 
 
-
 def save_frontpage(page, directory, filename):
     """Funkcija shrani vsebino spletne strani na naslovu "page" v datoteko
     "directory"/"filename"."""
@@ -48,18 +44,14 @@ def save_frontpage(page, directory, filename):
     save_string_to_file(tekst, directory, filename)
     print('Stran shranjena')
 
-def random_stevilo_sekund():
-    return random.randint(1, 4)
 
 def shrani_strani(seznam_strani):
-    for (leto, letno_stevilo_setov) in seznam_strani:
-        stevilo_strani = math.ceil(letno_stevilo_setov / 25)
-        for stran in range(1, stevilo_strani + 1):
-            url = brickset_glavni_url + f"{leto}/page-{stran}"
-            save_frontpage(url, 'LEGO_KOCKE', f"{leto}_stran_{stran}")
-            time.sleep(random_stevilo_sekund())
+    for leto in seznam_strani:
+        url = brickset_glavni_url + f"{leto}"
+        save_frontpage(url, 'BRICKSET_STRANI', f"kompleti_{leto}")
+        time.sleep(random.randint(1, 4))
 
-#shrani_strani(leta.leta)
+#shrani_strani(leta)
 
 def read_file_to_string(directory, filename):
     """Funkcija vrne celotno vsebino datoteke "directory"/"filename" kot niz."""
@@ -67,50 +59,50 @@ def read_file_to_string(directory, filename):
     with open(path, encoding='utf-8') as datoteka:
         return datoteka.read()
 
-vzorec_bloka = r"<article class='set'.*?<\/article>"
+vzorec_bloka = r"<article class='set'>.*?<\/article>"
 
 def najdi_bloke(page_content):
     bloki = re.findall(vzorec_bloka, page_content, re.DOTALL | re.IGNORECASE)
     return bloki
 
 vzorec_kompleta = re.compile(
-    r"title=\"(?P<id>.*?): (?P<Naslov>.*?)\" onError.*?"
-    r"<a href='\/sets\/theme-(?P<tema>.*?)'>.*?"
+    r"title=\"(?P<Id>.*?): (?P<Naslov>.*?)\" onError.*?"
+    r"<a href='\/sets\/theme-(?P<Tema>.*?)'>.*?"
     ,flags=re.DOTALL)
 
-vzorec_podteme = re.compile(r"<a class='subtheme' href='\/sets\/subtheme.*?'>(?P<podtema>.*?)<\/a>",flags=re.DOTALL)
-vzorec_za_tip_seta = re.compile(r"<dt>Set type<\/dt><dd>(?P<tip_seta>.*?)<\/dd>",flags=re.DOTALL)
-vzorec_za_podatke_o_skupnosti = re.compile(r"Our community<\/dt><dd class='hideingallery'>(?P<podatki_o_skupnosti>.*?)<\/dd>",flags=re.DOTALL)
+vzorec_podteme = re.compile(r"<a class='subtheme' href='\/sets\/subtheme.*?'>(?P<Podtema>.*?)<\/a>",flags=re.DOTALL)
+vzorec_za_tip_seta = re.compile(r"<dt>Set type<\/dt><dd>(?P<Tip_seta>.*?)<\/dd>",flags=re.DOTALL)
+vzorec_za_podatke_o_skupnosti = re.compile(r"Our community<\/dt><dd class='hideingallery'>(?P<Podatki_o_skupnosti>.*?)<\/dd>",flags=re.DOTALL)
 
-vzorec_ocene = re.compile(r"class='half'>&#10029;<\/span>(?P<ocena>.+?)<\/span>",flags=re.DOTALL)
-vzorec_števila_ocen = re.compile(r"href='ratings\?set=.*'>(?P<st_ocen>\d*) ratings<\/a>",flags=re.DOTALL)
-vzorec_števila_delov = re.compile(r"<dt>Pieces<\/dt><dd><a class='plain' href='\/inventories\/.+?'>(?P<st_delov>\d*)<\/a><\/dd>",flags=re.DOTALL)
-vzorec_za_stevilo_figuric = re.compile(r"<dt>Minifigs<\/dt><dd><a class='plain' href='\/minifigs\/in-.*?'>(?P<figure>.*?)<\/dd>",flags=re.DOTALL)
-vzorec_za_ceno = re.compile(r"<\/dd><dt>RRP<\/dt><dd>\$?.*? (?P<cena>.*?)€? \| <a class=",flags=re.DOTALL)
-vzorec_za_ceno_glede_na_kos = re.compile(r"<dt>PPP<\/dt><dd>.*?c?, (?P<cena_glede_na_kos>.*?)c<\/dd>",flags=re.DOTALL)
-vzorec_za_pakiranje = re.compile(r"<dt>Packaging<\/dt><dd>(?P<pakiranje>.*?)<\/dd>",flags=re.DOTALL)
-vzorec_za_dostopnost = re.compile(r"<dt>Availability<\/dt><dd>(?P<dostopnost>.*?)<\/dd>",flags=re.DOTALL)
-vzorec_za_oblikovalca = re.compile(r"<dt>Designer<\/dt><dd class='tags'><a href='\/sets\/designer-.*?'>(?P<oblikovalec>.*?)<\/a>",flags=re.DOTALL)
-
-vzorec_zelijo_komplet = re.compile(r"(?P<zelijo>\d+) want")
-vzorec_imajo_komplet = re.compile(r"(?P<imajo>\d+) own")
-vzorec_vse_figure = re.compile(r"(?P<vse>\d+?)<\/a>")
-vzorec_unikatne_figure = re.compile(r"(?P<unikatne>\d+?) Unique")
+vzorec_ocene = re.compile(r"<\/span>(?P<Ocena> \d.\d)<\/span>", flags=re.DOTALL)
+vzorec_števila_ocen = re.compile(r"href='ratings\?set=.*'>(?P<Št_ocen>\d*) ratings<\/a>", flags=re.DOTALL)
+vzorec_števila_delov = re.compile(r"<dt>Pieces<\/dt><dd><a class='plain' href='\/inventories\/.+?'>(?P<Št_delov>\d*)<\/a><\/dd>", flags=re.DOTALL)
+vzorec_za_stevilo_figuric = re.compile(r"<dt>Minifigs<\/dt><dd><a class='plain' href='\/minifigs\/in-.*?'>(?P<Figure>.*?)<\/dd>", flags=re.DOTALL)
+vzorec_za_ceno = re.compile(r"<\/dd><dt>RRP<\/dt><dd>\$?.*? (?P<Cena>.*?)€? \| <a class=", flags=re.DOTALL)
+vzorec_za_ceno_glede_na_kos = re.compile(r"<dt>PPP<\/dt><dd>.*?c?, (?P<Cena_glede_na_kos>.*?)c<\/dd>", flags=re.DOTALL)
+vzorec_za_pakiranje = re.compile(r"<dt>Packaging<\/dt><dd>(?P<Pakiranje>.*?)<\/dd>", flags=re.DOTALL)
+vzorec_za_dostopnost = re.compile(r"<dt>Availability<\/dt><dd>(?P<Dostopnost>.*?)<\/dd>", flags=re.DOTALL)
+vzorec_za_oblikovalca = re.compile(r"<dt>Designer<\/dt><dd class='tags'><a href='\/sets\/designer-.*?'>(?P<Oblikovalec>.*?)<\/a>", flags=re.DOTALL)
+vzorec_zelijo_komplet = re.compile(r"(?P<Zelijo>\d+) want", flags=re.DOTALL)
+vzorec_imajo_komplet = re.compile(r"(?P<Imajo>\d+) own", flags=re.DOTALL)
+vzorec_vse_figure = re.compile(r"(?P<Vse>\d+?)<\/a>", flags=re.DOTALL)
+vzorec_unikatne_figure = re.compile(r"(?P<Unikatne>\d+?) Unique", flags=re.DOTALL)
 
 vzorci = [
-    (vzorec_podteme, "podtema"),
-    (vzorec_za_tip_seta, "tip_seta"),
-    (vzorec_ocene, "ocena"),
-    (vzorec_števila_ocen, "st_ocen"),
-    (vzorec_števila_delov, "st_delov"),
-    (vzorec_za_ceno, "cena"),
-    (vzorec_za_ceno_glede_na_kos, "cena_glede_na_kos"),
-    (vzorec_za_pakiranje, "pakiranje"),
-    (vzorec_za_dostopnost, "dostopnost"),
-    (vzorec_za_oblikovalca, "oblikovalec")
+    (vzorec_podteme, "Podtema"),
+    (vzorec_za_tip_seta, "Tip_seta"),
+    (vzorec_ocene, "Ocena"),
+    (vzorec_števila_ocen, "Št_ocen"),
+    (vzorec_števila_delov, "Št_delov"),
+    (vzorec_za_ceno, "Cena"),
+    (vzorec_za_ceno_glede_na_kos, "Cena_glede_na_kos"),
+    (vzorec_za_pakiranje, "Pakiranje"),
+    (vzorec_za_dostopnost, "Dostopnost"),
+    (vzorec_za_oblikovalca, "Oblikovalec")
 ]
 
 def izlusci_podatke_iz_bloka(blok, leto):
+    # En sam večji regex bi najverjetneje bil bolj učinkovit, a je na strani občasno vrstni red podatkov drugačen in tak regex ne bi našel vseh podatkov.
     komplet = vzorec_kompleta.search(blok).groupdict()
     for (vzorec, lastnost) in vzorci:
         vrednost = vzorec.search(blok)
@@ -120,29 +112,29 @@ def izlusci_podatke_iz_bloka(blok, leto):
             komplet[lastnost] = None
     skupnost = vzorec_za_podatke_o_skupnosti.search(blok)
     if skupnost:
-        zelijo = vzorec_zelijo_komplet.search(skupnost['podatki_o_skupnosti'])
-        imajo = vzorec_imajo_komplet.search(skupnost['podatki_o_skupnosti'])
+        zelijo = vzorec_zelijo_komplet.search(skupnost['Podatki_o_skupnosti'])
+        imajo = vzorec_imajo_komplet.search(skupnost['Podatki_o_skupnosti'])
         if zelijo:
-            komplet['Želijo komplet'] = zelijo['zelijo']
+            komplet['Želijo_komplet'] = zelijo['Zelijo']
         else:
-            komplet['Želijo komplet'] = None
+            komplet['Želijo_komplet'] = 0
         if imajo:
-            komplet['Imajo komplet'] = imajo['imajo']
+            komplet['Imajo_komplet'] = imajo['Imajo']
         else:
-            komplet['Imajo komplet'] = None
+            komplet['Imajo_komplet'] = 0
     figure = vzorec_za_stevilo_figuric.search(blok)
     if figure:
-        vse = vzorec_vse_figure.search(figure['figure'])
-        unikatne = vzorec_unikatne_figure.search(figure['figure'])
+        vse = vzorec_vse_figure.search(figure['Figure'])
+        unikatne = vzorec_unikatne_figure.search(figure['Figure'])
         if vse:
-            komplet['Vse Minifigure'] = vse['vse']
+            komplet['Vse_Minifigure'] = vse['Vse']
         else: 
-            komplet['Vse Minifigure'] = None
+            komplet['Vse_Minifigure'] = 0
         if unikatne:
-            komplet['Unikatne Minifigure'] = unikatne['unikatne']
+            komplet['Unikatne_Minifigure'] = unikatne['Unikatne']
         else:
-            komplet['Unikatne Minifigure'] = None
-    komplet['Leto izdaje'] = leto
+            komplet['Unikatne_Minifigure'] = 0
+    komplet['Leto_izdaje'] = leto
     return komplet
 
 def izlusci_iz_strani(directory, filename, leto):
@@ -153,40 +145,22 @@ def izlusci_iz_strani(directory, filename, leto):
         kocke.append(podatki)
         print('Blok Izluščen')
 
+#izlusci_iz_strani('BRICKSET_STRANI', 'kompleti_2022', 2022)
 
-#izlusci_iz_strani('LEGO_KOCKE','2022_stran_1')
+#print(izlusci_iz_strani('BRICKSET_STRANI', 'kompleti_2022', 2022))
 
-
-def pripravi_imenik(ime_datoteke):
-    '''Če še ne obstaja, pripravi prazen imenik za dano datoteko.'''
-    imenik = os.path.dirname(ime_datoteke)
-    if imenik:
-        os.makedirs(imenik, exist_ok=True)
-
-def zapisi_csv(slovarji, imena_polj, ime_datoteke):
-    '''Iz seznama slovarjev ustvari CSV datoteko z glavo.'''
-    pripravi_imenik(ime_datoteke)
-    with open(ime_datoteke, 'w', encoding='utf-8') as csv_datoteka:
-        writer = csv.DictWriter(csv_datoteka, fieldnames=imena_polj)
-        writer.writeheader()
-        writer.writerows(slovarji)
-
-
-
-#for (leto, letno_stevilo_setov) in leta.leta:
-#        stevilo_strani = math.ceil(letno_stevilo_setov / 25)
-#        for stran in range(1, stevilo_strani + 1):
-#            izlusci_iz_strani('LEGO_KOCKE',f'{leto}_stran_{stran}', leto)
-#zapisi_csv(
-#    kocke,
-#    ["id","Naslov","tema","podtema","tip_seta","ocena","st_ocen","st_delov","cena","cena_glede_na_kos","pakiranje","dostopnost","oblikovalec","Želijo komplet","Imajo komplet","Vse Minifigure",'Unikatne Minifigure',"Leto izdaje"],
-#        'obdelani-podatki/kompleti.csv'
-#)
+for leto in leta:
+    izlusci_iz_strani('BRICKSET_STRANI',f'kompleti_{leto}', leto)
+orodja.zapisi_csv(
+    kocke,
+    ["Id","Naslov","Tema","Podtema","Tip_seta","Ocena","Št_ocen","Št_delov","Cena","Cena_glede_na_kos","Pakiranje","Dostopnost","Želijo_komplet","Imajo_komplet","Vse_Minifigure",'Unikatne_Minifigure',"Leto_izdaje", "Oblikovalec"],
+    'obdelani-podatki/kompleti.csv'
+)
 
 #koda, ki je iz csv datoteke odstranila prazne vrstice
-#with open('kompleti.csv', newline='', encoding='utf8') as in_file:
-#    with open('neurejeni_podatki.csv', 'w', newline='', encoding='utf8') as out_file:
-#        writer = csv.writer('kompleti.csv')
-#        for row in csv.reader('neurejeni_podatki.csv'):
-#            if row:
-#                writer.writerow(row)
+with open('obdelani-podatki/kompleti.csv', newline='', encoding='utf8') as in_file:
+    with open('podatki.csv', 'w', newline='', encoding='utf8') as out_file:
+        writer = csv.writer(out_file)
+        for row in csv.reader(in_file):
+            if row:
+                writer.writerow(row)
